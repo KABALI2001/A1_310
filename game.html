@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Tic Tac Toe Game</title>
+<style>
+    .board {  
+        display: grid;
+        grid-template-columns: repeat(3, 100px);
+        grid-gap: 10px;
+        margin-bottom: 20px;
+    }
+    .board div { 
+        width: 100px;
+        height: 100px;
+        border: 1px solid black;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: 24px;
+        cursor: pointer;
+    }
+    #serverMessages, #chatMessages, #userList { 
+        margin-top: 20px;
+        padding: 10px;
+        border: 1px dashed #666;
+        min-height: 50px;
+        color: black;
+        overflow-y: auto;
+    }
+    #chatInput, #sendButton { 
+        margin-top: 10px;
+    }
+</style>
+</head>
+<body onload="initGame();">
+    <h1>Tic Tac Toe</h1>
+    <div id="gameBoard" class="board"></div>
+    <button onclick="resetGame()">Reset Game</button>
+    <div id="serverMessages">Waiting for server...</div>
+
+    <!-- Chat and user list -->
+    <div id="chatMessages"></div>
+    <input type="text" id="chatInput" placeholder="Type message here">
+    <button id="sendButton" onclick="sendMessage()">Send</button>
+    <div id="userList"></div>
+
+    <script>
+        var ws;
+
+        function initGame() {
+            createBoard();
+            startGame();
+        }
+
+        function createBoard() {
+            const boardDiv = document.getElementById('gameBoard');
+            boardDiv.innerHTML = '';
+            for (let i = 0; i < 9; i++) {
+                const cellDiv = document.createElement('div');
+                cellDiv.addEventListener('click', () => sendMove(i));
+                cellDiv.innerText = '-';
+                boardDiv.appendChild(cellDiv);
+            }
+        }
+
+        function startGame() {
+            ws = new WebSocket("ws://localhost:49153/");
+            ws.onopen = function(event) {
+                console.log("Connection opened.");
+                const username = prompt("Enter your username:");
+                ws.send(JSON.stringify({action: "authenticate", username: username}));
+            };
+            ws.onmessage = function(event) {
+                console.log("Message from server: ", event.data);
+                const data = JSON.parse(event.data);
+                handleServerMessage(data);
+            };
+            ws.onerror = function(event) {
+                console.error("WebSocket error observed:", event);
+                document.getElementById('serverMessages').innerText = "WebSocket connection error. Please refresh the page.";
+            };
+            ws.onclose = function(event) {
+                console.log("Connection closed.");
+                document.getElementById('serverMessages').innerText = "Connection closed. Please refresh the page.";
+            };
+        }
+
+        function sendMessage() {
+            const message = document.getElementById('chatInput').value;
+            ws.send(JSON.stringify({action: "chat", message: message}));
+            document.getElementById('chatInput').value = '';
+        }
+
+        function sendMove(index) {
+            fetch('http://localhost:8000', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action: "move", move: index})
+            })
+            .then(response => response.json())
+            .then(data => updateBoard(data.board))
+            .catch(error => console.error('Error:', error));
+        }
+
+        function resetGame() {
+            fetch('http://localhost:8000', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({action: "reset"})
+            })
+            .then(response => response.json())
+            .then(data => updateBoard(data.board))
+            .catch(error => console.error('Error:', error));
+        }
+
+        function updateBoard(board) {
+            const boardDivs = document.getElementById('gameBoard').children;
+            board.forEach((cell, index) => {
+                boardDivs[index].innerText = cell !== " " ? cell : '-';
+            });
+        }
+
+        function handleServerMessage(data) {
+            switch (data.type) {
+                case 'board':
+                    updateBoard(data.board);
+                    break;
+                case 'info':
+                case 'winner':
+                    document.getElementById('serverMessages').innerText = data.message;
+                    break;
+                case 'chat':
+                    const chatMessages = document.getElementById('chatMessages');
+                    chatMessages.innerHTML += `<div>${data.message}</div>`;
+                    break;
+                case 'users':
+                    const userList = document.getElementById('userList');
+                    userList.innerHTML = '<h3>Online Users:</h3>' + data.users.map(user => `<div>${user}</div>`).join('');
+                    break;
+            }
+        }
+    </script>
+</body>
+</html>
