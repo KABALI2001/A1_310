@@ -115,6 +115,10 @@ function joinGame() {
                     console.log("Received invalid chat message data:", data);
                 }
                 break;
+            case 'tie':
+                alert('The game ended in a tie!');
+                location.reload(); // Refresh the page
+                break;
             case 'reset':
                 updateBoard(data.board);
                 gameStatus.textContent = 'Game reset!';

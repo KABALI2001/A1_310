@@ -22,7 +22,6 @@ class TicTacToeGame:
             return True
         return False
 
-
     def check_winner(self):
         lines = [
             [0, 1, 2], [3, 4, 5], [6, 7, 8],
@@ -72,7 +71,10 @@ async def handler(websocket, path):
                 if game.make_move(clients[websocket], int(data['position'])):
                     winner = game.check_winner()
                     if winner:
-                        await notify_players(game, {"action": "winner", "winner": winner})
+                        if winner == 'Draw':
+                            await notify_players(game, {"action": "tie"})
+                        else:
+                            await notify_players(game, {"action": "winner", "winner": winner})
                         game.reset_board()
                     else:
                         # Ensure to send back the correct player to make the next move
