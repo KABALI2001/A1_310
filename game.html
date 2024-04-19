@@ -10,7 +10,7 @@
             grid-template-columns: repeat(3, 100px);
             gap: 10px;
             margin-bottom: 20px;
-            display: none;  /* Initially hide the board */
+            display: none;  /* Controlled by JavaScript to show/hide */
         }
         .cell {
             width: 100px;
@@ -23,7 +23,7 @@
             cursor: pointer;
         }
         #chat, #message, #sendButton, #resetButton {
-            display: none;  /* Initially hide chat elements */
+            display: none;  /* Controlled by JavaScript to show/hide */
         }
         #chat {
             margin-top: 20px;
@@ -90,20 +90,20 @@
                         break;
                     case 'start':
                         gameStatus.textContent = 'Game started!';
-                        board.style.display = 'grid';  // Show the board
-                        chat.style.display = 'block';  // Show the chat
-                        messageInput.style.display = 'inline';  // Show the message input
-                        sendButton.style.display = 'inline';  // Show the send button
-                        resetButton.style.display = 'inline';  // Show the reset button
+                        board.style.display = 'grid';
+                        chat.style.display = 'block';
+                        messageInput.style.display = 'inline';
+                        sendButton.style.display = 'inline';
+                        resetButton.style.display = 'inline';
                         break;
                     case 'move':
                         updateBoard(data.board);
-                        currentPlayer = data.nextPlayer; // Update the current player from server response
+                        currentPlayer = data.nextPlayer;
                         updateActivePlayer();
                         break;
                     case 'winner':
                         alert(`Winner is ${data.winner}`);
-                        currentPlayer = ''; // Reset currentPlayer on win
+                        currentPlayer = '';
                         updateActivePlayer();
                         break;
                     case 'chat':
@@ -115,7 +115,7 @@
                         break;
                     case 'opponent_left':
                         alert('Your opponent has left the game.');
-                        currentPlayer = ''; // Disable moves if opponent left
+                        currentPlayer = '';
                         updateActivePlayer();
                         break;
                 }

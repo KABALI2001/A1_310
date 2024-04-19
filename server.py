@@ -16,11 +16,12 @@ class TicTacToeGame:
         self.player_names[player] = name
 
     def make_move(self, player, position):
-        if 0 <= position < 9 and self.board[position] == ' ' and player == self.current_player:
-            self.board[position] = self.players[player]
-            self.current_player = next(p for p in self.players if p != player)
+        if 0 <= position < 9 and self.board[position] == ' ' and player == self.player_names[self.current_player]:
+            self.board[position] = self.players[self.current_player]
+            self.current_player = next(p for p in self.players if p != self.current_player)
             return True
         return False
+
 
     def check_winner(self):
         lines = [
@@ -68,13 +69,14 @@ async def handler(websocket, path):
             game = games.get(websocket)
 
             if data['action'] == 'move':
-                if game.make_move(websocket, int(data['position'])):
+                if game.make_move(clients[websocket], int(data['position'])):
                     winner = game.check_winner()
                     if winner:
                         await notify_players(game, {"action": "winner", "winner": winner})
                         game.reset_board()
                     else:
-                        await notify_players(game, {"action": "move", "board": game.board})
+                        # Ensure to send back the correct player to make the next move
+                        await notify_players(game, {"action": "move", "board": game.board, "nextPlayer": game.current_player})
             elif data['action'] == 'reset':
                 game.reset_board()
                 await notify_players(game, {"action": "reset", "board": game.board})
@@ -91,13 +93,20 @@ async def handler(websocket, path):
             clients.pop(websocket, None)
         if websocket == waiting_player:
             waiting_player = None
+
         logging.info(f"{name} disconnected.")
 
 async def notify_players(game, message):
-    msg = json.dumps(message)
+    msg = {
+        "action": message["action"],
+        "board": game.board,
+        "nextPlayer": game.player_names[game.current_player]  # Get the player name
+    }
+    msg = json.dumps(msg)
     for player in game.players:
         if player.open:  # Ensure the WebSocket connection is open before sending
             await player.send(msg)
+
 
 start_server = websockets.serve(handler, "localhost", 6789)
 asyncio.get_event_loop().run_until_complete(start_server)
