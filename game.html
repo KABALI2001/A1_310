@@ -59,102 +59,106 @@
     <button id="sendButton" onclick="sendMessage()">Send</button>
 
     <script>
-        const board = document.getElementById('board');
-        const cells = document.querySelectorAll('.cell');
-        const chat = document.getElementById('chat');
-        const messageInput = document.getElementById('message');
-        const playerNameInput = document.getElementById('playerName');
-        const gameStatus = document.getElementById('gameStatus');
-        const sendButton = document.getElementById('sendButton');
-        const resetButton = document.getElementById('resetButton');
-        let ws;
-        let currentPlayer = '';
+       const board = document.getElementById('board');
+const cells = document.querySelectorAll('.cell');
+const chat = document.getElementById('chat');
+const messageInput = document.getElementById('message');
+const playerNameInput = document.getElementById('playerName');
+const gameStatus = document.getElementById('gameStatus');
+const sendButton = document.getElementById('sendButton');
+const resetButton = document.getElementById('resetButton');
+let ws;
+let currentPlayer = '';
 
-        function joinGame() {
-            ws = new WebSocket('ws://localhost:6789');
-            ws.onopen = () => {
-                const name = playerNameInput.value.trim();
-                if (name) {
-                    ws.send(JSON.stringify({name: name}));
-                    gameStatus.textContent = 'Connecting...';
+function joinGame() {
+    ws = new WebSocket('ws://localhost:6789');
+    ws.onopen = () => {
+        const name = playerNameInput.value.trim();
+        if (name) {
+            ws.send(JSON.stringify({name: name}));
+            gameStatus.textContent = 'Connecting...';
+        } else {
+            alert("Please enter a name before joining.");
+        }
+    };
+
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        switch (data.action) {
+            case 'wait':
+                gameStatus.textContent = 'Waiting for an opponent...';
+                break;
+            case 'start':
+                gameStatus.textContent = 'Game started!';
+                board.style.display = 'grid';
+                chat.style.display = 'block';
+                messageInput.style.display = 'inline';
+                sendButton.style.display = 'inline';
+                resetButton.style.display = 'inline';
+                break;
+            case 'move':
+                updateBoard(data.board);
+                currentPlayer = data.nextPlayer;
+                updateActivePlayer();
+                break;
+            case 'winner':
+                alert(`Winner is ${currentPlayer}!`);
+                currentPlayer = '';
+                updateActivePlayer();
+                // Refresh page
+                location.reload();
+                break;
+            case 'chat':
+                if (data.name && data.message) {
+                    chat.innerHTML += `<div><strong>${data.name}:</strong> ${data.message}</div>`;
                 } else {
-                    alert("Please enter a name before joining.");
+                    console.log("Received invalid chat message data:", data);
                 }
-            };
-
-            ws.onmessage = (event) => {
-                const data = JSON.parse(event.data);
-                switch (data.action) {
-                    case 'wait':
-                        gameStatus.textContent = 'Waiting for an opponent...';
-                        break;
-                    case 'start':
-                        gameStatus.textContent = 'Game started!';
-                        board.style.display = 'grid';
-                        chat.style.display = 'block';
-                        messageInput.style.display = 'inline';
-                        sendButton.style.display = 'inline';
-                        resetButton.style.display = 'inline';
-                        break;
-                    case 'move':
-                        updateBoard(data.board);
-                        currentPlayer = data.nextPlayer;
-                        updateActivePlayer();
-                        break;
-                    case 'winner':
-                        alert(`Winner is ${data.winner}`);
-                        currentPlayer = '';
-                        updateActivePlayer();
-                        //refresh page
-                        location.reload()
-                        break;
-                    case 'chat':
-                        chat.innerHTML += `<div><strong>${data.name}:</strong> ${data.message}</div>`;
-                        break;
-                    case 'reset':
-                        updateBoard(data.board);
-                        gameStatus.textContent = 'Game reset!';
-                        break;
-                    case 'opponent_left':
-                        alert('Your opponent has left the game.');
-                        currentPlayer = '';
-                        updateActivePlayer();
-                        break;
-                }
-            };
+                break;
+            case 'reset':
+                updateBoard(data.board);
+                gameStatus.textContent = 'Game reset!';
+                break;
+            case 'opponent_left':
+                alert('Your opponent has left the game.');
+                currentPlayer = '';
+                updateActivePlayer();
+                break;
         }
+    };
+}
 
-        function updateBoard(board) {
-            board.forEach((cell, index) => {
-                cells[index].textContent = cell === ' ' ? '' : cell;
-            });
-        }
+function updateBoard(board) {
+    board.forEach((cell, index) => {
+        cells[index].textContent = cell === ' ' ? '' : cell;
+    });
+}
 
-        function updateActivePlayer() {
-            if (currentPlayer === playerNameInput.value) {
-                gameStatus.textContent = "It's your turn.";
-                cells.forEach(cell => cell.style.pointerEvents = 'auto'); // Enable clicks
-            } else {
-                gameStatus.textContent = "Waiting for opponent's move.";
-                cells.forEach(cell => cell.style.pointerEvents = 'none'); // Disable clicks
-            }
-        }
+function updateActivePlayer() {
+    if (currentPlayer === playerNameInput.value) {
+        gameStatus.textContent = "It's your turn.";
+        cells.forEach(cell => cell.style.pointerEvents = 'auto'); // Enable clicks
+    } else {
+        gameStatus.textContent = "Waiting for opponent's move.";
+        cells.forEach(cell => cell.style.pointerEvents = 'none'); // Disable clicks
+    }
+}
 
-        board.addEventListener('click', function(event) {
-            if (event.target.className.includes('cell') && event.target.textContent === '') {
-                ws.send(JSON.stringify({action: 'move', position: parseInt(event.target.dataset.cellIndex)}));
-            }
-        });
+board.addEventListener('click', function(event) {
+    if (event.target.className.includes('cell') && event.target.textContent === '') {
+        ws.send(JSON.stringify({action: 'move', position: parseInt(event.target.dataset.cellIndex)}));
+    }
+});
 
-        function sendMessage() {
-            const message = messageInput.value;
-            ws.send(JSON.stringify({action: 'chat', message: message}));
-            messageInput.value = '';
-        }
+function sendMessage() {
+    const message = messageInput.value;
+    ws.send(JSON.stringify({action: 'chat', message: message}));
+    messageInput.value = '';
+}
 
-        function resetGame() {
-            ws.send(JSON.stringify({action: 'reset'}));
-        }
+function resetGame() {
+    ws.send(JSON.stringify({action: 'reset'}));
+}
     </script>
 </body>
 </html>

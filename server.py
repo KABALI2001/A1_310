@@ -81,7 +81,9 @@ async def handler(websocket, path):
                 game.reset_board()
                 await notify_players(game, {"action": "reset", "board": game.board})
             elif data['action'] == 'chat':
-                await notify_players(game, {"action": "chat", "name": clients[websocket], "message": data['message']})
+                name = clients[websocket]
+                message = data['message']
+                await notify_players(game, {"action": "chat", "name": name, "message": message})
 
     except websockets.exceptions.ConnectionClosed:
         if websocket in games:
@@ -102,6 +104,11 @@ async def notify_players(game, message):
         "board": game.board,
         "nextPlayer": game.player_names[game.current_player]  # Get the player name
     }
+
+    if message["action"] == "chat":
+        msg["name"] = message["name"]
+        msg["message"] = message["message"]
+
     msg = json.dumps(msg)
     for player in game.players:
         if player.open:  # Ensure the WebSocket connection is open before sending
