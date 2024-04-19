@@ -58,7 +58,7 @@
             background-color: rgba(255, 255, 255, 0.7);
         }
 
-        #chat, #message, #sendButton, #resetButton {
+        #chat, #message, #sendButton, #resetButton, #endGameButton{
             display: none;
         }
 
@@ -110,7 +110,7 @@
 <body>
     <div class="container">
         <input type="text" id="playerName" placeholder="Enter your name">
-        <button onclick="joinGame()">Join Game</button>
+        <button id="joinGameButton" onclick="joinGame()">Join Game</button>
         <div id="gameStatus"></div>
         <div class="board" id="board">
             <div class="cell" data-cell-index="0"></div>
@@ -127,18 +127,21 @@
         <div id="chat">Say Hello...</div>
         <input type="text" id="message" placeholder="Type a message...">
         <button id="sendButton" onclick="sendMessage()">Send</button>
+        <button id="endGameButton" onclick="endGame()">End Game</button>
     </div>
     <script>
-       const board = document.getElementById('board');
-const cells = document.querySelectorAll('.cell');
-const chat = document.getElementById('chat');
-const messageInput = document.getElementById('message');
-const playerNameInput = document.getElementById('playerName');
-const gameStatus = document.getElementById('gameStatus');
-const sendButton = document.getElementById('sendButton');
-const resetButton = document.getElementById('resetButton');
-let ws;
-let currentPlayer = '';
+        const board = document.getElementById('board');
+        const cells = document.querySelectorAll('.cell');
+        const chat = document.getElementById('chat');
+        const messageInput = document.getElementById('message');
+        const playerNameInput = document.getElementById('playerName');
+        const gameStatus = document.getElementById('gameStatus');
+        const joinGameButton = document.getElementById('joinGameButton');
+        const sendButton = document.getElementById('sendButton');
+        const endGameButton = document.getElementById('endGameButton');
+        const resetButton = document.getElementById('resetButton');
+        let ws;
+        let currentPlayer = '';
 
 function joinGame() {
     ws = new WebSocket('ws://localhost:6789');
@@ -164,8 +167,10 @@ function joinGame() {
                 board.style.display = 'grid';
                 chat.style.display = 'block';
                 messageInput.style.display = 'inline';
+                joinGameButton.style.display = 'none';
                 sendButton.style.display = 'inline';
-                resetButton.style.display = 'inline';
+                endGameButton.style.display = 'inline';
+                resetButton.style.visibility = 'inline';
                 break;
             case 'move':
                 updateBoard(data.board);
@@ -196,6 +201,8 @@ function joinGame() {
                 break;
             case 'opponent_left':
                 alert('Your opponent has left the game.');
+                // Refresh the page
+                location.reload();
                 currentPlayer = '';
                 updateActivePlayer();
                 break;
@@ -233,6 +240,12 @@ function sendMessage() {
 
 function resetGame() {
     ws.send(JSON.stringify({action: 'reset'}));
+}
+
+function endGame(){
+    // alert that player has left
+    alert('You have left the game.')
+    location.reload();
 }
     </script>
 </body>
