@@ -5,59 +5,129 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tic-Tac-Toe Game</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap');
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #f9e8e8;
+            color: #4d4d4d;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+
+        .container {
+            background-color: rgba(255, 255, 255, 0.3);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+            padding: 30px;
+            max-width: 500px;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
         .board {
             display: grid;
             grid-template-columns: repeat(3, 100px);
             gap: 10px;
             margin-bottom: 20px;
-            display: none;  /* Controlled by JavaScript to show/hide */
+            visibility: hidden;
         }
+
         .cell {
             width: 100px;
             height: 100px;
             display: flex;
             align-items: center;
             justify-content: center;
-            border: 1px solid #000;
+            border: 2px solid #e6c9c9;
+            border-radius: 10px;
             font-size: 24px;
             cursor: pointer;
+            background-color: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            transition: background-color 0.3s ease;
         }
+
+        .cell:hover {
+            background-color: rgba(255, 255, 255, 0.7);
+        }
+
         #chat, #message, #sendButton, #resetButton {
-            display: none;  /* Controlled by JavaScript to show/hide */
+            display: none;
         }
+
         #chat {
             margin-top: 20px;
-            width: 320px;
-            height: 300px;
-            border: 1px solid black;
+            width: 100%;
+            max-height: 200px;
+            border: 2px solid #e6c9c9;
+            border-radius: 10px;
             overflow-y: scroll;
-            padding: 8px;
+            padding: 10px;
+            background-color: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
         }
+
         #message, #playerName {
-            margin-top: 5px;
+            margin-top: 10px;
+            padding: 10px;
+            border: 2px solid #e6c9c9;
+            border-radius: 5px;
+            background-color: rgba(255, 255, 255, 0.5);
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            width: 100%;
+        }
+
+        button {
+            margin-top: 10px;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 5px;
+            background-color: #e6c9c9;
+            color: #4d4d4d;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.3s ease;
+        }
+
+        button:hover {
+            background-color: #d9b3b3;
+        }
+
+        #gameStatus {
+            text-align: center;
+            margin-bottom: 20px;
+            font-weight: 600;
         }
     </style>
 </head>
 <body>
-    <input type="text" id="playerName" placeholder="Enter your name">
-    <button onclick="joinGame()">Join Game</button>
-    <div id="gameStatus"></div>
-    <div class="board" id="board">
-        <div class="cell" data-cell-index="0"></div>
-        <div class="cell" data-cell-index="1"></div>
-        <div class="cell" data-cell-index="2"></div>
-        <div class="cell" data-cell-index="3"></div>
-        <div class="cell" data-cell-index="4"></div>
-        <div class="cell" data-cell-index="5"></div>
-        <div class="cell" data-cell-index="6"></div>
-        <div class="cell" data-cell-index="7"></div>
-        <div class="cell" data-cell-index="8"></div>
+    <div class="container">
+        <input type="text" id="playerName" placeholder="Enter your name">
+        <button onclick="joinGame()">Join Game</button>
+        <div id="gameStatus"></div>
+        <div class="board" id="board">
+            <div class="cell" data-cell-index="0"></div>
+            <div class="cell" data-cell-index="1"></div>
+            <div class="cell" data-cell-index="2"></div>
+            <div class="cell" data-cell-index="3"></div>
+            <div class="cell" data-cell-index="4"></div>
+            <div class="cell" data-cell-index="5"></div>
+            <div class="cell" data-cell-index="6"></div>
+            <div class="cell" data-cell-index="7"></div>
+            <div class="cell" data-cell-index="8"></div>
+        </div>
+        <button id="resetButton" onclick="resetGame()">Reset Game</button>
+        <div id="chat">Say Hello...</div>
+        <input type="text" id="message" placeholder="Type a message...">
+        <button id="sendButton" onclick="sendMessage()">Send</button>
     </div>
-    <button id="resetButton" onclick="resetGame()">Reset Game</button>
-    <div id="chat"></div>
-    <input type="text" id="message" placeholder="Type a message...">
-    <button id="sendButton" onclick="sendMessage()">Send</button>
-
     <script>
        const board = document.getElementById('board');
 const cells = document.querySelectorAll('.cell');
@@ -90,6 +160,7 @@ function joinGame() {
                 break;
             case 'start':
                 gameStatus.textContent = 'Game started!';
+                board.style.visibility = 'visible';
                 board.style.display = 'grid';
                 chat.style.display = 'block';
                 messageInput.style.display = 'inline';
