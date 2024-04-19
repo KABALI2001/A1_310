@@ -16,9 +16,9 @@ class TicTacToeGame:
         self.player_names[player] = name
 
     def make_move(self, player, position):
-        if player == self.current_player and self.board[position] == ' ':
+        if 0 <= position < 9 and self.board[position] == ' ' and player == self.current_player:
             self.board[position] = self.players[player]
-            self.current_player = next(p for p in self.players if p != player)  # Toggle current player
+            self.current_player = next(p for p in self.players if p != player)
             return True
         return False
 

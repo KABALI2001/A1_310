@@ -10,7 +10,7 @@
             grid-template-columns: repeat(3, 100px);
             gap: 10px;
             margin-bottom: 20px;
-            display: none;  /* Hide the board initially */
+            display: none;  /* Initially hide the board */
         }
         .cell {
             width: 100px;
@@ -23,7 +23,7 @@
             cursor: pointer;
         }
         #chat, #message, #sendButton, #resetButton {
-            display: none;  /* Hide chat elements initially */
+            display: none;  /* Initially hide chat elements */
         }
         #chat {
             margin-top: 20px;
@@ -48,7 +48,7 @@
         <div class="cell" data-cell-index="2"></div>
         <div class="cell" data-cell-index="3"></div>
         <div class="cell" data-cell-index="4"></div>
-        <div the="cell" data-cell-index="5"></div>
+        <div class="cell" data-cell-index="5"></div>
         <div class="cell" data-cell-index="6"></div>
         <div class="cell" data-cell-index="7"></div>
         <div class="cell" data-cell-index="8"></div>
@@ -68,20 +68,20 @@
         const sendButton = document.getElementById('sendButton');
         const resetButton = document.getElementById('resetButton');
         let ws;
-    
+        let currentPlayer = '';
+
         function joinGame() {
             ws = new WebSocket('ws://localhost:6789');
             ws.onopen = () => {
-                const name = playerNameInput.value;
-                if (name.trim() !== "") {
-                    // Send properly formatted JSON containing the name
+                const name = playerNameInput.value.trim();
+                if (name) {
                     ws.send(JSON.stringify({name: name}));
                     gameStatus.textContent = 'Connecting...';
                 } else {
                     alert("Please enter a name before joining.");
                 }
             };
-    
+
             ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
                 switch (data.action) {
@@ -98,9 +98,13 @@
                         break;
                     case 'move':
                         updateBoard(data.board);
+                        currentPlayer = data.nextPlayer; // Update the current player from server response
+                        updateActivePlayer();
                         break;
                     case 'winner':
                         alert(`Winner is ${data.winner}`);
+                        currentPlayer = ''; // Reset currentPlayer on win
+                        updateActivePlayer();
                         break;
                     case 'chat':
                         chat.innerHTML += `<div><strong>${data.name}:</strong> ${data.message}</div>`;
@@ -111,33 +115,44 @@
                         break;
                     case 'opponent_left':
                         alert('Your opponent has left the game.');
+                        currentPlayer = ''; // Disable moves if opponent left
+                        updateActivePlayer();
                         break;
                 }
             };
         }
-    
+
         function updateBoard(board) {
             board.forEach((cell, index) => {
-                cells[index].textContent = cell;
+                cells[index].textContent = cell === ' ' ? '' : cell;
             });
         }
-    
+
+        function updateActivePlayer() {
+            if (currentPlayer === playerNameInput.value) {
+                gameStatus.textContent = "It's your turn.";
+                cells.forEach(cell => cell.style.pointerEvents = 'auto'); // Enable clicks
+            } else {
+                gameStatus.textContent = "Waiting for opponent's move.";
+                cells.forEach(cell => cell.style.pointerEvents = 'none'); // Disable clicks
+            }
+        }
+
         board.addEventListener('click', function(event) {
-            if (event.target.className.includes('cell')) {
+            if (event.target.className.includes('cell') && event.target.textContent === '') {
                 ws.send(JSON.stringify({action: 'move', position: parseInt(event.target.dataset.cellIndex)}));
             }
         });
-    
+
         function sendMessage() {
             const message = messageInput.value;
             ws.send(JSON.stringify({action: 'chat', message: message}));
             messageInput.value = '';
         }
-    
+
         function resetGame() {
             ws.send(JSON.stringify({action: 'reset'}));
         }
     </script>
-    
 </body>
 </html>
