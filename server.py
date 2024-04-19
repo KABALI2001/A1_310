@@ -1,138 +1,104 @@
 import asyncio
 import websockets
-import socket
-import threading
 import json
-import random
-from http.server import HTTPServer, BaseHTTPRequestHandler
+import logging
 
-# Game board representation
-board = [" " for _ in range(9)]
+logging.basicConfig(level=logging.INFO)
 
-# A dictionary to keep track of users and their corresponding WebSocket.
-connected_users = {}
+class TicTacToeGame:
+    def __init__(self, player1, player2):
+        self.players = {player1: 'X', player2: 'O'}
+        self.player_names = {player1: '', player2: ''}
+        self.board = [' ' for _ in range(9)]
+        self.current_player = player1
 
-# Winning combinations
-win_combinations = [
-    (0, 1, 2), (3, 4, 5), (6, 7, 8),  # Horizontal
-    (0, 3, 6), (1, 4, 7), (2, 5, 8),  # Vertical
-    (0, 4, 8), (2, 4, 6)              # Diagonal
-]
+    def register_name(self, player, name):
+        self.player_names[player] = name
 
-def check_winner():
-    for combo in win_combinations:
-        if board[combo[0]] == board[combo[1]] == board[combo[2]] != " ":
-            return board[combo[0]]  # Return 'X' or 'O'
-    if " " not in board:
-        return "Draw"
-    return None
+    def make_move(self, player, position):
+        if player == self.current_player and self.board[position] == ' ':
+            self.board[position] = self.players[player]
+            self.current_player = next(p for p in self.players if p != player)  # Toggle current player
+            return True
+        return False
 
-def reset_board():
-    global board
-    board = [" " for _ in range(9)]
-
-async def broadcast_message(message):
-    for ws in connected_users.values():
-        await ws.send(message)
-
-def make_server_move():
-    empty_indices = [i for i, x in enumerate(board) if x == " "]
-    if not empty_indices:
+    def check_winner(self):
+        lines = [
+            [0, 1, 2], [3, 4, 5], [6, 7, 8],
+            [0, 3, 6], [1, 4, 7], [2, 5, 8],
+            [0, 4, 8], [2, 4, 6]
+        ]
+        for line in lines:
+            if self.board[line[0]] == self.board[line[1]] == self.board[line[2]] != ' ':
+                return self.board[line[0]]
+        if ' ' not in self.board:
+            return 'Draw'
         return None
-    move = random.choice(empty_indices)
-    board[move] = 'O'
-    return move
 
-class GameHTTPRequestHandler(BaseHTTPRequestHandler):
-    def do_POST(self):
-        content_length = int(self.headers['Content-Length'])
-        post_data = self.rfile.read(content_length)
-        data = json.loads(post_data.decode('utf-8'))
+    def reset_board(self):
+        self.board = [' ' for _ in range(9)]
 
-        if data['action'] == 'move':
-            index = int(data['move'])
-            if 0 <= index < 9 and board[index] == " ":
-                board[index] = 'X'  # Player's move
-                make_server_move()
-                winner = check_winner()
-                if winner:
-                    response = {'board': board, 'winner': winner}
-                    reset_board()
-                else:
-                    response = {'board': board, 'winner': "No winner yet"}
-            else:
-                response = {'error': 'Position already taken', 'board': board}
-        elif data['action'] == 'reset':
-            reset_board()
-            response = {'board': board, 'winner': "No winner"}
+clients = {}
+games = {}
+waiting_player = None
 
-        self.send_response(200)
-        self.send_header('Content-type', 'application/json')
-        self.end_headers()
-        self.wfile.write(json.dumps(response).encode('utf-8'))
-
-def run_http_server():
-    server_address = ('', 8000)
-    httpd = HTTPServer(server_address, GameHTTPRequestHandler)
-    print("HTTP Server running on port 8000")
-    httpd.serve_forever()
-
-def handle_tcp_client(conn, addr):
-    print(f"TCP Connection from {addr}")
-    while True:
-        data = conn.recv(1024).decode('utf-8').strip()
-        if not data:
-            break
-        print(f"Received from TCP client {addr}: {data}")
-        conn.sendall(data.encode('utf-8'))
-    conn.close()
-    print(f"TCP connection with {addr} closed")
-
-def start_tcp_server():
-    HOST = '127.0.0.1'
-    PORT = 49152
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind((HOST, PORT))
-    server.listen()
-    print(f"TCP Server listening on {HOST}:{PORT}")
-    while True:
-        conn, addr = server.accept()
-        threading.Thread(target=handle_tcp_client, args=(conn, addr)).start()
-
-async def websocket_handler(websocket, path):
-    username = ''
+async def handler(websocket, path):
+    global waiting_player
     try:
-        auth_data = await websocket.recv()
-        user_info = json.loads(auth_data)
-        username = user_info.get("username")
-        if not username:
-            await websocket.close(reason="Authentication failed: Username not provided.")
-            return
-        connected_users[username] = websocket
-        await broadcast_message(json.dumps({"type": "info", "message": f"{username} has joined the game."}))
-        await websocket.send(json.dumps({"type": "board", "board": board}))
+        name_data = await websocket.recv()
+        name = json.loads(name_data)['name']
+        clients[websocket] = name
+        logging.info(f"{name} connected.")
 
-        async for message in websocket:
+        if waiting_player and waiting_player.open:
+            # Start a new game
+            game = TicTacToeGame(waiting_player, websocket)
+            games[waiting_player] = games[websocket] = game
+            game.register_name(waiting_player, clients[waiting_player])
+            game.register_name(websocket, clients[websocket])
+            await notify_players(game, {"action": "start"})
+            waiting_player = None
+        else:
+            waiting_player = websocket
+            await websocket.send(json.dumps({"action": "wait"}))
+
+        while True:
+            message = await websocket.recv()
             data = json.loads(message)
-            if data.get("action") == "chat":
-                await broadcast_message(json.dumps({"type": "chat", "message": f"{username}: {data['message']}"}))
+            game = games.get(websocket)
+
+            if data['action'] == 'move':
+                if game.make_move(websocket, int(data['position'])):
+                    winner = game.check_winner()
+                    if winner:
+                        await notify_players(game, {"action": "winner", "winner": winner})
+                        game.reset_board()
+                    else:
+                        await notify_players(game, {"action": "move", "board": game.board})
+            elif data['action'] == 'reset':
+                game.reset_board()
+                await notify_players(game, {"action": "reset", "board": game.board})
+            elif data['action'] == 'chat':
+                await notify_players(game, {"action": "chat", "name": clients[websocket], "message": data['message']})
+
     except websockets.exceptions.ConnectionClosed:
-        print("WebSocket connection closed")
-    finally:
-        if username in connected_users:
-            del connected_users[username]
-            await broadcast_message(json.dumps({"type": "info", "message": f"{username} has left the game."}))
+        if websocket in games:
+            game = games[websocket]
+            opponent = next((p for p in game.players if p != websocket), None)
+            if opponent:
+                await opponent.send(json.dumps({"action": "opponent_left"}))
+            games.pop(websocket, None)
+            clients.pop(websocket, None)
+        if websocket == waiting_player:
+            waiting_player = None
+        logging.info(f"{name} disconnected.")
 
-async def start_websocket_server():
-    async with websockets.serve(websocket_handler, "localhost", 49153):
-        print("WebSocket Server running on ws://localhost:49153/")
-        await asyncio.Future()  # Run forever
+async def notify_players(game, message):
+    msg = json.dumps(message)
+    for player in game.players:
+        if player.open:  # Ensure the WebSocket connection is open before sending
+            await player.send(msg)
 
-def main():
-    loop = asyncio.get_event_loop()
-    loop.run_in_executor(None, start_tcp_server)
-    loop.run_in_executor(None, run_http_server)
-    loop.run_forever()
-
-if __name__ == "__main__":
-    main()
+start_server = websockets.serve(handler, "localhost", 6789)
+asyncio.get_event_loop().run_until_complete(start_server)
+asyncio.get_event_loop().run_forever()

@@ -1,145 +1,143 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Tic Tac Toe Game</title>
-<style>
-    .board {  
-        display: grid;
-        grid-template-columns: repeat(3, 100px);
-        grid-gap: 10px;
-        margin-bottom: 20px;
-    }
-    .board div { 
-        width: 100px;
-        height: 100px;
-        border: 1px solid black;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        font-size: 24px;
-        cursor: pointer;
-    }
-    #serverMessages, #chatMessages, #userList { 
-        margin-top: 20px;
-        padding: 10px;
-        border: 1px dashed #666;
-        min-height: 50px;
-        color: black;
-        overflow-y: auto;
-    }
-    #chatInput, #sendButton { 
-        margin-top: 10px;
-    }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic-Tac-Toe Game</title>
+    <style>
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 100px);
+            gap: 10px;
+            margin-bottom: 20px;
+            display: none;  /* Hide the board initially */
+        }
+        .cell {
+            width: 100px;
+            height: 100px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #000;
+            font-size: 24px;
+            cursor: pointer;
+        }
+        #chat, #message, #sendButton, #resetButton {
+            display: none;  /* Hide chat elements initially */
+        }
+        #chat {
+            margin-top: 20px;
+            width: 320px;
+            height: 300px;
+            border: 1px solid black;
+            overflow-y: scroll;
+            padding: 8px;
+        }
+        #message, #playerName {
+            margin-top: 5px;
+        }
+    </style>
 </head>
-<body onload="initGame();">
-    <h1>Tic Tac Toe</h1>
-    <div id="gameBoard" class="board"></div>
-    <button onclick="resetGame()">Reset Game</button>
-    <div id="serverMessages">Waiting for server...</div>
-
-    <!-- Chat and user list -->
-    <div id="chatMessages"></div>
-    <input type="text" id="chatInput" placeholder="Type message here">
+<body>
+    <input type="text" id="playerName" placeholder="Enter your name">
+    <button onclick="joinGame()">Join Game</button>
+    <div id="gameStatus"></div>
+    <div class="board" id="board">
+        <div class="cell" data-cell-index="0"></div>
+        <div class="cell" data-cell-index="1"></div>
+        <div class="cell" data-cell-index="2"></div>
+        <div class="cell" data-cell-index="3"></div>
+        <div class="cell" data-cell-index="4"></div>
+        <div the="cell" data-cell-index="5"></div>
+        <div class="cell" data-cell-index="6"></div>
+        <div class="cell" data-cell-index="7"></div>
+        <div class="cell" data-cell-index="8"></div>
+    </div>
+    <button id="resetButton" onclick="resetGame()">Reset Game</button>
+    <div id="chat"></div>
+    <input type="text" id="message" placeholder="Type a message...">
     <button id="sendButton" onclick="sendMessage()">Send</button>
-    <div id="userList"></div>
 
     <script>
-        var ws;
-
-        function initGame() {
-            createBoard();
-            startGame();
-        }
-
-        function createBoard() {
-            const boardDiv = document.getElementById('gameBoard');
-            boardDiv.innerHTML = '';
-            for (let i = 0; i < 9; i++) {
-                const cellDiv = document.createElement('div');
-                cellDiv.addEventListener('click', () => sendMove(i));
-                cellDiv.innerText = '-';
-                boardDiv.appendChild(cellDiv);
-            }
-        }
-
-        function startGame() {
-            ws = new WebSocket("ws://localhost:49153/");
-            ws.onopen = function(event) {
-                console.log("Connection opened.");
-                const username = prompt("Enter your username:");
-                ws.send(JSON.stringify({action: "authenticate", username: username}));
+        const board = document.getElementById('board');
+        const cells = document.querySelectorAll('.cell');
+        const chat = document.getElementById('chat');
+        const messageInput = document.getElementById('message');
+        const playerNameInput = document.getElementById('playerName');
+        const gameStatus = document.getElementById('gameStatus');
+        const sendButton = document.getElementById('sendButton');
+        const resetButton = document.getElementById('resetButton');
+        let ws;
+    
+        function joinGame() {
+            ws = new WebSocket('ws://localhost:6789');
+            ws.onopen = () => {
+                const name = playerNameInput.value;
+                if (name.trim() !== "") {
+                    // Send properly formatted JSON containing the name
+                    ws.send(JSON.stringify({name: name}));
+                    gameStatus.textContent = 'Connecting...';
+                } else {
+                    alert("Please enter a name before joining.");
+                }
             };
-            ws.onmessage = function(event) {
-                console.log("Message from server: ", event.data);
+    
+            ws.onmessage = (event) => {
                 const data = JSON.parse(event.data);
-                handleServerMessage(data);
+                switch (data.action) {
+                    case 'wait':
+                        gameStatus.textContent = 'Waiting for an opponent...';
+                        break;
+                    case 'start':
+                        gameStatus.textContent = 'Game started!';
+                        board.style.display = 'grid';  // Show the board
+                        chat.style.display = 'block';  // Show the chat
+                        messageInput.style.display = 'inline';  // Show the message input
+                        sendButton.style.display = 'inline';  // Show the send button
+                        resetButton.style.display = 'inline';  // Show the reset button
+                        break;
+                    case 'move':
+                        updateBoard(data.board);
+                        break;
+                    case 'winner':
+                        alert(`Winner is ${data.winner}`);
+                        break;
+                    case 'chat':
+                        chat.innerHTML += `<div><strong>${data.name}:</strong> ${data.message}</div>`;
+                        break;
+                    case 'reset':
+                        updateBoard(data.board);
+                        gameStatus.textContent = 'Game reset!';
+                        break;
+                    case 'opponent_left':
+                        alert('Your opponent has left the game.');
+                        break;
+                }
             };
-            ws.onerror = function(event) {
-                console.error("WebSocket error observed:", event);
-                document.getElementById('serverMessages').innerText = "WebSocket connection error. Please refresh the page.";
-            };
-            ws.onclose = function(event) {
-                console.log("Connection closed.");
-                document.getElementById('serverMessages').innerText = "Connection closed. Please refresh the page.";
-            };
         }
-
-        function sendMessage() {
-            const message = document.getElementById('chatInput').value;
-            ws.send(JSON.stringify({action: "chat", message: message}));
-            document.getElementById('chatInput').value = '';
-        }
-
-        function sendMove(index) {
-            fetch('http://localhost:8000', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({action: "move", move: index})
-            })
-            .then(response => response.json())
-            .then(data => updateBoard(data.board))
-            .catch(error => console.error('Error:', error));
-        }
-
-        function resetGame() {
-            fetch('http://localhost:8000', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({action: "reset"})
-            })
-            .then(response => response.json())
-            .then(data => updateBoard(data.board))
-            .catch(error => console.error('Error:', error));
-        }
-
+    
         function updateBoard(board) {
-            const boardDivs = document.getElementById('gameBoard').children;
             board.forEach((cell, index) => {
-                boardDivs[index].innerText = cell !== " " ? cell : '-';
+                cells[index].textContent = cell;
             });
         }
-
-        function handleServerMessage(data) {
-            switch (data.type) {
-                case 'board':
-                    updateBoard(data.board);
-                    break;
-                case 'info':
-                case 'winner':
-                    document.getElementById('serverMessages').innerText = data.message;
-                    break;
-                case 'chat':
-                    const chatMessages = document.getElementById('chatMessages');
-                    chatMessages.innerHTML += `<div>${data.message}</div>`;
-                    break;
-                case 'users':
-                    const userList = document.getElementById('userList');
-                    userList.innerHTML = '<h3>Online Users:</h3>' + data.users.map(user => `<div>${user}</div>`).join('');
-                    break;
+    
+        board.addEventListener('click', function(event) {
+            if (event.target.className.includes('cell')) {
+                ws.send(JSON.stringify({action: 'move', position: parseInt(event.target.dataset.cellIndex)}));
             }
+        });
+    
+        function sendMessage() {
+            const message = messageInput.value;
+            ws.send(JSON.stringify({action: 'chat', message: message}));
+            messageInput.value = '';
+        }
+    
+        function resetGame() {
+            ws.send(JSON.stringify({action: 'reset'}));
         }
     </script>
+    
 </body>
 </html>
