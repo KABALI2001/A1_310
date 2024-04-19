@@ -105,6 +105,8 @@
                         alert(`Winner is ${data.winner}`);
                         currentPlayer = '';
                         updateActivePlayer();
+                        //refresh page
+                        location.reload()
                         break;
                     case 'chat':
                         chat.innerHTML += `<div><strong>${data.name}:</strong> ${data.message}</div>`;
